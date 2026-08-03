@@ -1869,6 +1869,8 @@ private:
   bool mShowControlBounds = false;
   bool mShowAreaDrawn = false;
   bool mResizingInProcess = false;
+  bool mHasPendingDrawScale = false;
+  float mPendingDrawScale = 1.f;
   bool mLayoutOnResize = false;
   bool mEnableMultiTouch = false;
   EUIResizerMode mGUISizeMode = EUIResizerMode::Scale;

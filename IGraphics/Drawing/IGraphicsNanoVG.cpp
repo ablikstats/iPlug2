@@ -487,16 +487,23 @@ void IGraphicsNanoVG::DrawResize()
 {
   ScopedGLContext scopedGLCtx {this};
 
+  if (!mVG)
+    return;
+
+  // Create the new FBO before deleting the old one so we never briefly hold a
+  // null framebuffer mid-resize (a common source of flicker/blink).
+  NVGframebuffer* newFB = nvgCreateFramebuffer(mVG, WindowWidth() * GetScreenScale(),
+                                               WindowHeight() * GetScreenScale(), 0);
+  if (newFB == nullptr)
+  {
+    DBGMSG("Could not init FBO.\n");
+    return;
+  }
+
   if (mMainFrameBuffer != nullptr)
     nvgDeleteFramebuffer(mMainFrameBuffer);
-  
-  if (mVG)
-  {
-    mMainFrameBuffer = nvgCreateFramebuffer(mVG, WindowWidth() * GetScreenScale(), WindowHeight() * GetScreenScale(), 0);
-  
-    if (mMainFrameBuffer == nullptr)
-      DBGMSG("Could not init FBO.\n");
-  }
+
+  mMainFrameBuffer = newFB;
 }
 
 void IGraphicsNanoVG::BeginFrame()

@@ -1520,8 +1520,19 @@ void IGraphics::OnDragResize(float x, float y)
   {
     float scaleX = (x * GetDrawScale()) / mMouseDownX;
     float scaleY = (y * GetDrawScale()) / mMouseDownY;
+    const float newScale = std::min(scaleX, scaleY);
 
-    Resize(Width(), Height(), std::min(scaleX, scaleY));
+    // Always remember the latest desired scale so EndDragResize can snap to it.
+    mPendingDrawScale = newScale;
+    mHasPendingDrawScale = true;
+
+    // Throttle Scale-mode updates: NanoVG recreates its FBO and the platform
+    // resizes the HWND on every Resize(), which flickers if done every mouse
+    // sample. Skip tiny steps; mouse-up applies the pending scale exactly.
+    if (std::abs(newScale - GetDrawScale()) < 0.025f)
+      return;
+
+    Resize(Width(), Height(), newScale);
   }
   else
   {
@@ -1983,9 +1994,14 @@ void IGraphics::CreatePopupMenu(IControl& control, IPopupMenu& menu, const IRECT
 void IGraphics::EndDragResize()
 {
   mResizingInProcess = false;
-  
+
   if (GetResizerMode() == EUIResizerMode::Scale)
   {
+    // Apply the last throttled scale target exactly, then refresh bitmaps.
+    if (mHasPendingDrawScale && std::abs(mPendingDrawScale - GetDrawScale()) > 0.0001f)
+      Resize(Width(), Height(), mPendingDrawScale);
+    mHasPendingDrawScale = false;
+
     // If scaling up we may want to load in high DPI bitmaps if scale > 1.
     ForAllControls(&IControl::OnRescale);
     SetAllControlsDirty();

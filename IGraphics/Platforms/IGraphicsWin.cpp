@@ -828,16 +828,28 @@ void IGraphicsWin::PlatformResize(bool parentHasResized)
     if (!dw && !dh)
       return;
 
-    SetWindowPos(mPlugWnd, 0, 0, 0, dlgW + dw, dlgH + dh, SETPOS_FLAGS);
+    // During live corner-scale, discard old client bits (avoids stretch-blit
+    // flicker) and paint synchronously into the new size.
+    UINT flags = SETPOS_FLAGS;
+    if (GetResizingInProcess())
+      flags |= SWP_NOCOPYBITS;
+
+    SetWindowPos(mPlugWnd, 0, 0, 0, dlgW + dw, dlgH + dh, flags);
 
     if (pParent && !parentHasResized)
     {
-      SetWindowPos(pParent, 0, 0, 0, parentW + dw, parentH + dh, SETPOS_FLAGS);
+      SetWindowPos(pParent, 0, 0, 0, parentW + dw, parentH + dh, flags);
     }
 
     if (pGrandparent && !parentHasResized)
     {
-      SetWindowPos(pGrandparent, 0, 0, 0, grandparentW + dw, grandparentH + dh, SETPOS_FLAGS);
+      SetWindowPos(pGrandparent, 0, 0, 0, grandparentW + dw, grandparentH + dh, flags);
+    }
+
+    if (GetResizingInProcess())
+    {
+      InvalidateRect(mPlugWnd, nullptr, FALSE);
+      UpdateWindow(mPlugWnd);
     }
   }
 }
