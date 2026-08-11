@@ -158,6 +158,10 @@ public:
   void BeginInformHostOfParamChangeFromUI(int paramIdx) override { BeginInformHostOfParamChange(paramIdx); }
   
   void EndInformHostOfParamChangeFromUI(int paramIdx) override { EndInformHostOfParamChange(paramIdx); }
+
+  /** Optional host group-edit span (VST3 IComponentHandler2). No-op on other APIs. */
+  virtual void BeginHostGroupEdit() {}
+  virtual void EndHostGroupEdit() {}
   
   bool EditorResizeFromUI(int viewWidth, int viewHeight, bool needsPlatformResize) override;
   

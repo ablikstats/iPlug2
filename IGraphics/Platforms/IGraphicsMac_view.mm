@@ -1202,10 +1202,17 @@ static void MakeCursorFromName(NSCursor*& cursor, const char *name)
   }
 
   CoreTextFontDescriptor* CTFontDescriptor = CoreTextHelpers::GetCTFontDescriptor(text, sFontDescriptorCache);
-  double ratio = CTFontDescriptor->GetEMRatio() * mGraphics->GetDrawScale();
-  NSFontDescriptor* fontDescriptor = (NSFontDescriptor*) CTFontDescriptor->GetDescriptor();
-  NSFont* font = [NSFont fontWithDescriptor: fontDescriptor size: text.mSize * ratio];
-  [mTextFieldView setFont: font];
+  if (CTFontDescriptor)
+  {
+    double ratio = CTFontDescriptor->GetEMRatio() * mGraphics->GetDrawScale();
+    NSFontDescriptor* fontDescriptor = (NSFontDescriptor*) CTFontDescriptor->GetDescriptor();
+    NSFont* font = [NSFont fontWithDescriptor: fontDescriptor size: text.mSize * ratio];
+    [mTextFieldView setFont: font];
+  }
+  else
+  {
+    [mTextFieldView setFont: [NSFont systemFontOfSize: text.mSize * mGraphics->GetDrawScale()]];
+  }
   
   switch (text.mAlign)
   {

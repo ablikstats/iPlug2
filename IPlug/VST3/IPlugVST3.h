@@ -59,6 +59,8 @@ public:
   void BeginInformHostOfParamChange(int idx) override;
   void InformHostOfParamChange(int idx, double normalizedValue) override;
   void EndInformHostOfParamChange(int idx) override;
+  void BeginHostGroupEdit() override { startGroupEdit(); }
+  void EndHostGroupEdit() override { finishGroupEdit(); }
   void InformHostOfPresetChange() override {}
   void InformHostOfParameterDetailsChange() override;
   bool EditorResize(int viewWidth, int viewHeight) override;
