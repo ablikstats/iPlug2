@@ -15,8 +15,11 @@
 */
 
 #include "ITextEntryControl.h"
+#include "IGraphics.h"
 #include "IPlugPlatform.h"
 #include "IPlugUtilities.h"
+
+#include <vector>
 
 using namespace iplug;
 using namespace igraphics;
@@ -146,7 +149,18 @@ void ITextEntryControl::OnMouseDown(float x, float y, const IMouseMod& mod)
 {
   if(!mRECT.Contains(x, y))
   {
+    // Commit, then re-dispatch so the click still hits the control underneath
+    // (e.g. an Activate button). Without this, users must click twice.
     CommitEdit();
+    if (GetUI())
+    {
+      GetUI()->ReleaseMouseCapture();
+      IMouseInfo info;
+      info.x = x;
+      info.y = y;
+      info.ms = mod;
+      GetUI()->OnMouseDown(std::vector<IMouseInfo>{info});
+    }
     return;
   }
     

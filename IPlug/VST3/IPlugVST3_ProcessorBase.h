@@ -142,6 +142,11 @@ public:
     
     if(matchingIdx > -1)
     {
+      int nInChans = 0, nOutChans = 0;
+      for (int c : inputBuses) nInChans += c;
+      for (int c : outputBuses) nOutChans += c;
+      pPlug->OnHostIOChanged(nInChans, nOutChans);
+
       pPlug->removeAudioBusses();
 
       const IOConfig* pConfig = GetIOConfig(matchingIdx);

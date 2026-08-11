@@ -88,6 +88,13 @@ public:
    * @param active \c true if the host has activated the plug-in */
   virtual void OnActivate(bool active) { TRACE }
 
+  /** Called by API classes when the host negotiates a new channel I/O arrangement
+   * (e.g. VST3 setBusArrangements). Counts are the negotiated bus totals and may
+   * update before NChannelsConnected() reflects them in ProcessBlock.
+   * @param nInputChans Total input channels across buses in the new arrangement
+   * @param nOutputChans Total output channels across buses in the new arrangement */
+  virtual void OnHostIOChanged(int nInputChans, int nOutputChans) { (void) nInputChans; (void) nOutputChans; }
+
 #pragma mark - Methods you can call - some of which have custom implementations in the API classes, some implemented in IPlugProcessor.cpp
 
   /** Send a single MIDI message // TODO: info about what thread should this be called on or not called on!
