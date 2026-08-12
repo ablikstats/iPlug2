@@ -31,7 +31,7 @@
 
 #define kMaxAdditionalMIDINodes 15
 #define kMaxAuxOutputStems 32
-#define kSynchronizedParameterQueueSize 32
+#define kSynchronizedParameterQueueSize 64
 
 BEGIN_IPLUG_NAMESPACE
 

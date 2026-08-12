@@ -172,6 +172,12 @@ AAX_Result GetEffectDescriptions(AAX_ICollection* pC)
     
     setupInfo.mNeedsTransport = true;
     setupInfo.mLatency = PLUG_LATENCY;
+#ifdef AAX_DISABLE_MULTIMONO
+    // Distance / DistanceBus are true multichannel (stereo imaging / hub).
+    // Multi-mono in Pro Tools instantiates per-channel mono copies and is the
+    // wrong insert path — hide it so users only get the multichannel menu.
+    setupInfo.mMultiMonoSupport = false;
+#endif
   };
   
   if((PLUG_TYPE != 1) && (totalNInBuses > 1)) // Effect with sidechain input
@@ -253,6 +259,19 @@ AAX_Result GetEffectDescriptions(AAX_ICollection* pC)
   pC->SetManufacturerName(AAX_PLUG_MFR_STR);
   
   pC->SetPackageVersion(PLUG_VERSION_HEX);
+
+#ifdef AAX_NEVER_CACHE
+  // Force Pro Tools to re-read stem/type IDs after layout changes (stale cache
+  // was a common source of AAE -20038 after AAX_TYPE_IDS / CHANNEL_IO edits).
+  {
+    AAX_IPropertyMap* pProps = pC->NewPropertyMap();
+    if (pProps)
+    {
+      pProps->AddProperty(AAX_eProperty_Constraint_NeverCache, true);
+      pC->SetProperties(pProps);
+    }
+  }
+#endif
   
   return err;
 }

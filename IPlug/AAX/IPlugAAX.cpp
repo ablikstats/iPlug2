@@ -209,6 +209,11 @@ AAX_Result IPlugAAX::EffectInit()
     }
     
     mParameterManager.AddParameter(pAAXParam);
+
+    // Sample-accurate / reliable Pro Tools automation playback requires the
+    // param to be in the synchronized set. Queue size raised to 64 for Bus.
+    if (pAAXParam && pParam->GetCanAutomate())
+      AddSynchronizedParameter(*pAAXParam);
   }
   
   AAX_CSampleRate sr;
@@ -222,20 +227,20 @@ AAX_Result IPlugAAX::EffectInit()
 AAX_Result IPlugAAX::UpdateParameterNormalizedValue(AAX_CParamID paramID, double iValue, AAX_EUpdateSource iSource)
 {
   TRACE
-  
-  AAX_Result  result = AAX_SUCCESS;
-  
+
+  // Let the monolithic AAX base mark synchronized params dirty for the render
+  // queue, then mirror into IPlug so ProcessBlock / UI see the same value.
+  AAX_Result result = AAX_CIPlugParameters::UpdateParameterNormalizedValue(paramID, iValue, iSource);
+  if (AAX_SUCCESS != result)
+    return result;
+
   AAX_IParameter* pAAXParameter = mParameterManager.GetParameterByID(paramID);
-    
   if (pAAXParameter == nullptr)
     return AAX_ERROR_INVALID_PARAMETER_ID;
-  
-  // Store the value into the AAX parameter
-  pAAXParameter->UpdateNormalizedValue(iValue);
-  
+
   int paramIdx = atoi(paramID) - kAAXParamIdxOffset;
-  
-  if ((paramIdx > kNoParameter) && (paramIdx < NParams())) 
+
+  if ((paramIdx > kNoParameter) && (paramIdx < NParams()))
   {
     ENTER_PARAMS_MUTEX
     GetParam(paramIdx)->SetNormalized(iValue);
@@ -243,12 +248,9 @@ AAX_Result IPlugAAX::UpdateParameterNormalizedValue(AAX_CParamID paramID, double
     OnParamChange(paramIdx, kHost);
     LEAVE_PARAMS_MUTEX
   }
-  
-  // Now the control has changed
-  result = mPacketDispatcher.SetDirty(paramID);
-  
+
   mNumPlugInChanges++;
-  
+
   return result;
 }
 
