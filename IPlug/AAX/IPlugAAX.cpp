@@ -210,10 +210,11 @@ AAX_Result IPlugAAX::EffectInit()
     
     mParameterManager.AddParameter(pAAXParam);
 
-    // Sample-accurate / reliable Pro Tools automation playback requires the
-    // param to be in the synchronized set. Queue size raised to 64 for Bus.
-    if (pAAXParam && pParam->GetCanAutomate())
-      AddSynchronizedParameter(*pAAXParam);
+    // Do NOT AddSynchronizedParameter for every automatable control.
+    // DistanceBus exposes 32+ lane params; stuffing them all into the monolithic
+    // sync queue made Pro Tools Write→Read unreliable (touches/queue overload).
+    // Block-rate automation via UpdateParameterNormalizedValue is enough for
+    // pan/distance/Output; Touch/SetParameter still records Write automation.
   }
   
   AAX_CSampleRate sr;
