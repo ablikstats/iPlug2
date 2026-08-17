@@ -150,7 +150,14 @@ public:
    * @param chunk The incoming chunk containing the state data.
    * @param startPos The position in the chunk where the data starts
    * @return The new chunk position (endPos)*/
-  virtual int UnserializeState(const IByteChunk& chunk, int startPos) { TRACE return UnserializeParams(chunk, startPos); }
+  virtual int UnserializeState(const IByteChunk& chunk, int startPos)
+  {
+    TRACE
+    const int pos = UnserializeParams(chunk, startPos);
+    if (pos >= 0 && pos < chunk.Size())
+      return -1;
+    return pos;
+  }
   
   /** VST3 ONLY! - THIS IS ONLY INCLUDED FOR COMPATIBILITY - NOONE ELSE SHOULD NEED IT!
    * @param chunk The output bytechunk where data can be serialized.

@@ -23,6 +23,10 @@
 #include <TargetConditionals.h>
 #endif
 
+#ifdef OS_MAC
+#include <dlfcn.h>
+#endif
+
 #ifdef IGRAPHICS_METAL
 extern std::map<std::string, void*> gTextureMap;
 #endif
@@ -174,6 +178,21 @@ bool GetResourcePathFromBundle(const char* fileName, const char* searchExt, WDL_
     else
     {
       pBundle = [NSBundle bundleWithIdentifier:[NSString stringWithUTF8String:bundleID]];
+    }
+
+    // Xcode PRODUCT_BUNDLE_IDENTIFIER can disagree with BUNDLE_ID from config.h
+    // (com.* vs audio.*). Fonts then fail to load and the CLAP UI has no text.
+    if (!pBundle)
+    {
+      Dl_info dl{};
+      if (dladdr(reinterpret_cast<const void*>(&GetResourcePathFromBundle), &dl) && dl.dli_fname)
+      {
+        NSString* binaryPath = [NSString stringWithUTF8String:dl.dli_fname];
+        NSString* bundlePath = [[[binaryPath stringByDeletingLastPathComponent]
+                                 stringByDeletingLastPathComponent]
+                                stringByDeletingLastPathComponent];
+        pBundle = [NSBundle bundleWithPath:bundlePath];
+      }
     }
 
     NSString* pFile = [[NSString stringWithUTF8String:fileName] stringByDeletingPathExtension];

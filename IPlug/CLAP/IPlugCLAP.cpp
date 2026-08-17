@@ -269,6 +269,55 @@ clap_process_status IPlugCLAP::process(const clap_process* pProcess) noexcept
   // Local tail handling
   bool localTail = !mHostHasTail && !GetTailIsInfinite() && GetTailSize();
   bool insQuiet = true;
+
+  if ((pProcess->audio_inputs_count && !pProcess->audio_inputs) ||
+      (pProcess->audio_outputs_count && !pProcess->audio_outputs))
+  {
+    ProcessOutputEvents(pProcess->out_events, nFrames);
+    return CLAP_PROCESS_CONTINUE;
+  }
+
+  auto busHasBuffers = [](const clap_audio_buffer& bus) -> bool
+  {
+    if (!bus.channel_count)
+      return true;
+    if (bus.data32)
+    {
+      for (uint32_t j = 0; j < bus.channel_count; j++)
+      {
+        if (!bus.data32[j])
+          return false;
+      }
+      return true;
+    }
+    if (bus.data64)
+    {
+      for (uint32_t j = 0; j < bus.channel_count; j++)
+      {
+        if (!bus.data64[j])
+          return false;
+      }
+      return true;
+    }
+    return false;
+  };
+
+  for (uint32_t i = 0; i < pProcess->audio_inputs_count; i++)
+  {
+    if (!busHasBuffers(pProcess->audio_inputs[i]))
+    {
+      ProcessOutputEvents(pProcess->out_events, nFrames);
+      return CLAP_PROCESS_CONTINUE;
+    }
+  }
+  for (uint32_t i = 0; i < pProcess->audio_outputs_count; i++)
+  {
+    if (!busHasBuffers(pProcess->audio_outputs[i]))
+    {
+      ProcessOutputEvents(pProcess->out_events, nFrames);
+      return CLAP_PROCESS_CONTINUE;
+    }
+  }
   
   // Sum IO channels
   for (uint32_t i = 0; i < pProcess->audio_inputs_count; i++)
@@ -430,16 +479,25 @@ bool IPlugCLAP::stateSave(const clap_ostream* pStream) noexcept
 
   const uint8_t* pData = chunk.GetData();
   int64_t remaining = chunk.Size();
+  uint64_t request = remaining > 0 ? static_cast<uint64_t>(remaining) : 0;
 
   while (remaining > 0)
   {
-    const int64_t written = pStream->write(pStream, pData, static_cast<uint64_t>(remaining));
+    const uint64_t toWrite = std::min(request, static_cast<uint64_t>(remaining));
+    const int64_t written = pStream->write(pStream, pData, toWrite);
 
-    if (written <= 0)
+    if (written > 0)
+    {
+      pData += written;
+      remaining -= written;
+      request = static_cast<uint64_t>(remaining);
+      continue;
+    }
+
+    if (toWrite <= 1)
       return false;
 
-    pData += written;
-    remaining -= written;
+    request = std::max<uint64_t>(1, toWrite / 2);
   }
 
   return true;
@@ -582,6 +640,8 @@ void IPlugCLAP::ProcessInputEvents(const clap_input_events* pInputEvents) noexce
       {
         case CLAP_EVENT_NOTE_ON:
         {
+          if (!DoesMIDIIn())
+            break;
           // N.B. velocity stored 0-1
           auto pNote = ClapEventCast<clap_event_note>(pEvent);
           auto velocity = static_cast<int>(std::round(pNote->velocity * 127.0));
@@ -593,6 +653,8 @@ void IPlugCLAP::ProcessInputEvents(const clap_input_events* pInputEvents) noexce
           
         case CLAP_EVENT_NOTE_OFF:
         {
+          if (!DoesMIDIIn())
+            break;
           auto pNote = ClapEventCast<clap_event_note>(pEvent);
           msg.MakeNoteOffMsg(pNote->key, pEvent->time, pNote->channel);
           ProcessMidiMsg(msg);
@@ -602,6 +664,8 @@ void IPlugCLAP::ProcessInputEvents(const clap_input_events* pInputEvents) noexce
           
         case CLAP_EVENT_MIDI:
         {
+          if (!DoesMIDIIn())
+            break;
           auto pMidiEvent = ClapEventCast<clap_event_midi>(pEvent);
           msg = IMidiMsg(pEvent->time, pMidiEvent->data[0], pMidiEvent->data[1], pMidiEvent->data[2]);
           ProcessMidiMsg(msg);
@@ -624,6 +688,9 @@ void IPlugCLAP::ProcessInputEvents(const clap_input_events* pInputEvents) noexce
           
           int paramIdx = pParamValue->param_id;
           double value = pParamValue->value;
+
+          if (paramIdx < 0 || paramIdx >= NParams())
+            break;
           
           IParam* pParam = GetParam(paramIdx);
           const bool isDoubleType = pParam->Type() == IParam::kTypeDouble;
