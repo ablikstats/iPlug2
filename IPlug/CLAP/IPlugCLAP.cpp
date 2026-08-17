@@ -9,7 +9,15 @@
 */
 
 #include <algorithm>
+#include <cmath>
 #include <cstdio>
+#include <cstdlib>
+#include <cstring>
+#include <cctype>
+
+#if defined(_MSC_VER) || defined(__SSE2__) || defined(_M_X64) || defined(__x86_64__)
+#include <xmmintrin.h>
+#endif
 
 #include "IPlugCLAP.h"
 #include "IPlugPluginBase.h"
@@ -195,6 +203,11 @@ bool InputIsSilent(const T* data, int nFrames)
 
 clap_process_status IPlugCLAP::process(const clap_process* pProcess) noexcept
 {
+#if defined(_MM_FLUSH_ZERO_ON)
+  _MM_SET_FLUSH_ZERO_MODE(_MM_FLUSH_ZERO_ON);
+  _MM_SET_DENORMALS_ZERO_MODE(_MM_DENORMALS_ZERO_ON);
+#endif
+
   IMidiMsg msg;
   SysExData sysEx;
   
@@ -414,8 +427,22 @@ bool IPlugCLAP::stateSave(const clap_ostream* pStream) noexcept
   
   if (!SerializeState(chunk))
     return false;
-  
-  return pStream->write(pStream, chunk.GetData(), chunk.Size()) == chunk.Size();
+
+  const uint8_t* pData = chunk.GetData();
+  int64_t remaining = chunk.Size();
+
+  while (remaining > 0)
+  {
+    const int64_t written = pStream->write(pStream, pData, static_cast<uint64_t>(remaining));
+
+    if (written <= 0)
+      return false;
+
+    pData += written;
+    remaining -= written;
+  }
+
+  return true;
 }
 
 bool IPlugCLAP::stateLoad(const clap_istream* pStream) noexcept
@@ -435,7 +462,12 @@ bool IPlugCLAP::stateLoad(const clap_istream* pStream) noexcept
   bool restoredOK = UnserializeState(chunk, 0) >= 0;
   
   if (restoredOK)
+  {
     OnRestoreState();
+
+    if (GetClapHost().canUseParams())
+      GetClapHost().paramsRescan(CLAP_PARAM_RESCAN_VALUES);
+  }
   
   return restoredOK;
 }
@@ -484,20 +516,26 @@ bool IPlugCLAP::paramsValueToText(clap_id paramIdx, double value, char* display,
   const IParam* pParam = GetParam(paramIdx);
   const bool isDoubleType = pParam->Type() == IParam::kTypeDouble;
 
+  if (!isDoubleType)
+    value = pParam->Constrain(value);
+
   WDL_String str;
-  
   pParam->GetDisplay(value, isDoubleType, str);
-  
-  // Add Label
-  if (CStringHasContents(pParam->GetLabel()))
+
+  const char* label = pParam->GetLabel();
+  const char* text = str.Get();
+  const bool numeric = text && (std::isdigit(static_cast<unsigned char>(text[0])) ||
+                                ((text[0] == '-' || text[0] == '+') && std::isdigit(static_cast<unsigned char>(text[1]))));
+
+  if (numeric && CStringHasContents(label) && !std::strstr(text, label))
   {
     str.Append(" ");
-    str.Append(pParam->GetLabel());
+    str.Append(label);
   }
-  
-  if (size < str.GetLength())
+
+  if (size <= static_cast<uint32_t>(str.GetLength()))
     return false;
-    
+
   strcpy(display, str.Get());
   return true;
 }
@@ -506,8 +544,17 @@ bool IPlugCLAP::paramsTextToValue(clap_id paramIdx, const char* display, double*
 {
   const IParam* pParam = GetParam(paramIdx);
   const bool isDoubleType = pParam->Type() == IParam::kTypeDouble;
-  const double paramValue = pParam->StringToValue(display);
-  
+  double paramValue = pParam->StringToValue(display);
+
+  if (isDoubleType && display)
+  {
+    const char* kHz = std::strstr(display, "kHz");
+    if (!kHz)
+      kHz = std::strstr(display, "khz");
+    if (kHz)
+      paramValue = pParam->Constrain(std::atof(display) * 1000.0);
+  }
+
   *pValue = isDoubleType ? pParam->ToNormalized(paramValue) : paramValue;
   return true;
 }
@@ -798,12 +845,12 @@ bool IPlugCLAP::audioPortsGetConfig(uint32_t index, clap_audio_ports_config* pCo
   pConfig->input_port_count = static_cast<uint32_t>(NBuses(kInput, index));
   pConfig->output_port_count = static_cast<uint32_t>(NBuses(kOutput, index));
 
-  pConfig->has_main_input = pConfig->input_port_count > 1;
+  pConfig->has_main_input = pConfig->input_port_count > 0;
   pConfig->main_input_channel_count = pConfig->has_main_input ? getNChans(kInput, 0) : 0;
   pConfig->main_input_port_type = ClapPortType(pConfig->main_input_channel_count);
-  
-  pConfig->has_main_output = pConfig->output_port_count > 1;
-  pConfig->main_output_channel_count = pConfig->has_main_input ? getNChans(kOutput, 0) : 0;
+
+  pConfig->has_main_output = pConfig->output_port_count > 0;
+  pConfig->main_output_channel_count = pConfig->has_main_output ? getNChans(kOutput, 0) : 0;
   pConfig->main_output_port_type = ClapPortType(pConfig->main_output_channel_count);
 
   return true;
