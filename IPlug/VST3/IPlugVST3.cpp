@@ -134,6 +134,9 @@ ParamValue PLUGIN_API IPlugVST3::getParamNormalized(ParamID tag)
 
 tresult PLUGIN_API IPlugVST3::setParamNormalized(ParamID tag, ParamValue value)
 {
+  if (tag == kBypassParam)
+    SetBypassed(value > 0.5);
+
   if (IPlugVST3ControllerBase::SetParamNormalized(this, tag, value))
     return kResultTrue;
   else

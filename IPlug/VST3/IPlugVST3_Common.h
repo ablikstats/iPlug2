@@ -13,6 +13,7 @@
 #include "pluginterfaces/base/ibstream.h"
 #
 #include "IPlugAPIBase.h"
+#include "IPlugProcessor.h"
 #include "IPlugVST3_Parameter.h"
 #include "IPlugVST3_ControllerBase.h"
 
@@ -31,16 +32,23 @@ struct IPlugVST3State
     
     if (pPlug->SerializeState(chunk))
     {
-      /*
-       int chunkSize = chunk.Size();
-       void* data = (void*) &chunkSize;
-       state->write(data, (Steinberg::int32) sizeof(int));*/
       pState->write(chunk.GetData(), chunk.Size());
     }
     else
       return false;
-    
-    Steinberg::int32 toSaveBypass = pPlug->GetBypassed() ? 1 : 0;
+
+    // Host Bypass is a VST3-only parameter (kIsBypass), not an IPlug IParam.
+    // Steinberg's "Parameter Bypass persistence" test sets it on the controller
+    // and round-trips via PresetFile save/load. Save from either side so a
+    // controller write is not lost if process() has not yet applied it.
+    Steinberg::int32 toSaveBypass = 0;
+    if (IPlugProcessor* proc = dynamic_cast<IPlugProcessor*>(pPlug))
+      toSaveBypass = proc->GetBypassed() ? 1 : 0;
+    if (IPlugVST3ControllerBase* ctrl = dynamic_cast<IPlugVST3ControllerBase*>(pPlug))
+    {
+      if (ctrl->mBypassParameter && ctrl->mBypassParameter->getNormalized() > 0.5)
+        toSaveBypass = 1;
+    }
     pState->write(&toSaveBypass, sizeof (Steinberg::int32));
     
     return true;
@@ -66,18 +74,27 @@ struct IPlugVST3State
       
       chunk.PutBytes(buffer, bytesRead);
     }
-    int pos = pPlug->UnserializeState(chunk,0);
-    
+    int pos = pPlug->UnserializeState(chunk, 0);
+
+    // Bypass is appended after the plugin blob. Prefer leftover bytes in the
+    // already-read chunk (UnserializeState must not consume this int32). Fall
+    // back to seeking the original stream. Missing footer is not a hard fail.
     Steinberg::int32 savedBypass = 0;
-    
-    pState->seek(pos,Steinberg::IBStream::IStreamSeekMode::kIBSeekSet);
-    if (pState->read (&savedBypass, sizeof (Steinberg::int32)) != Steinberg::kResultOk) {
-      return false;
+    if (pos >= 0 && (chunk.Size() - pos) >= (int) sizeof(Steinberg::int32))
+    {
+      chunk.Get(&savedBypass, pos);
     }
-    
-    IPlugVST3ControllerBase* pController = dynamic_cast<IPlugVST3ControllerBase*>(pPlug);
-    
-    if (pController)
+    else if (pos >= 0)
+    {
+      pState->seek(pos, Steinberg::IBStream::IStreamSeekMode::kIBSeekSet);
+      Steinberg::int32 nRead = 0;
+      pState->read(&savedBypass, sizeof(Steinberg::int32), &nRead);
+    }
+
+    if (IPlugProcessor* proc = dynamic_cast<IPlugProcessor*>(pPlug))
+      proc->SetBypassed(savedBypass != 0);
+
+    if (IPlugVST3ControllerBase* pController = dynamic_cast<IPlugVST3ControllerBase*>(pPlug))
       pController->UpdateParams(pPlug, savedBypass);
     
     pPlug->OnRestoreState();

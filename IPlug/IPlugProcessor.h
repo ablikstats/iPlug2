@@ -130,6 +130,9 @@ public:
   /** @return \c true if the plugin is currently bypassed */
   bool GetBypassed() const { return mBypassed; }
 
+  /** Set host bypass. Used by API wrappers when restoring VST3 kIsBypass. */
+  void SetBypassed(bool bypassed) { mBypassed = bypassed; }
+
   /** @return \c true if the plugin is currently rendering off-line */
   bool GetRenderingOffline() const { return mRenderingOffline; };
 
@@ -288,7 +291,6 @@ protected:
   void ZeroScratchBuffers();
   void SetSampleRate(double sampleRate) { mSampleRate = sampleRate; }
   void SetBlockSize(int blockSize);
-  void SetBypassed(bool bypassed) { mBypassed = bypassed; }
   void SetTimeInfo(const ITimeInfo& timeInfo) { mTimeInfo = timeInfo; }
   void SetRenderingOffline(bool renderingOffline) { mRenderingOffline = renderingOffline; }
   const WDL_String& GetChannelLabel(ERoute direction, int idx) { return mChannelData[direction].Get(idx)->mLabel; }
