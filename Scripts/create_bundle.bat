@@ -5,6 +5,16 @@ SET Format=%3
 
 echo Create AAX/VST3 Package Directories
 
+REM A raw binary copied onto the bundle path (a file named Plugin.vst3) blocks
+REM mkdir of Contents\Resources\Snapshots. MSBuild then stops with MSB3191.
+if exist %BundleDir% (
+  if not exist %BundleDir%\ (
+    echo Replacing file with bundle directory: %BundleDir%
+    attrib -r -h -s %BundleDir%
+    del /f /q %BundleDir%
+  )
+)
+
 if %Format% == ".vst3" (
 SET X86=arm64ec-win
 SET X86_64=x86_64-win
