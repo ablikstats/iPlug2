@@ -90,6 +90,7 @@ public:
   void InformHostOfParamChange(int idx, double normalizedValue) override;
   void EndInformHostOfParamChange(int idx) override;
   bool EditorResize(int viewWidth, int viewHeight) override;
+  void GetTrackName(WDL_String& str) override;
   
   // IPlugProcessor
   void SetTailSize(int tailSize) override;

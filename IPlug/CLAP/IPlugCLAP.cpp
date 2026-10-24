@@ -61,6 +61,18 @@ IPlugCLAP::IPlugCLAP(const InstanceInfo& info, const Config& config)
   CreateTimer();
 }
 
+void IPlugCLAP::GetTrackName(WDL_String& str)
+{
+  str.Set("");
+  if (!GetClapHost().canUseTrackInfo())
+    return;
+
+  clap_track_info info {};
+  if (GetClapHost().trackInfoGet(&info)
+      && (info.flags & CLAP_TRACK_INFO_HAS_TRACK_NAME))
+    str.Set(info.name);
+}
+
 uint32_t IPlugCLAP::tailGet() const noexcept
 {
   return GetTailIsInfinite() ? std::numeric_limits<uint32_t>::max() : GetTailSize();

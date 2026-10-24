@@ -123,6 +123,9 @@ public:
   /** Get the name of the track that the plug-in is inserted on */
   virtual void GetTrackName(WDL_String& str) {}
 
+  /** Get a stable host channel UID when the plug-in API/host provides one. */
+  virtual void GetTrackUID(WDL_String& str) {}
+
   /** Get the index of the track that the plug-in is inserted on */
   virtual int GetTrackIndex() { return 0; }
 

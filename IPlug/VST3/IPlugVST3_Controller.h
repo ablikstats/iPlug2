@@ -88,6 +88,9 @@ public:
   /** Get the name of the track that the plug-in is inserted on */
   void GetTrackName(WDL_String& str) override { str = mChannelName; };
 
+  /** Get the host's stable channel UID, when supplied via ChannelContext. */
+  void GetTrackUID(WDL_String& str) override { str = mChannelUID; };
+
   /** Get the index of the track that the plug-in is inserted on */
   int GetTrackIndex() override { return mChannelIndex; };
 
